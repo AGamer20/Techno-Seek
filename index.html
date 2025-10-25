@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Techno Seek</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="Techno-Seek-Logo.png">
     <!-- 1. Import an Arabic-compatible font (like Tajawal from Google Fonts) -->
     <style>
@@ -276,6 +277,7 @@
         let keyPressTimers = {};
         let isKeyPressed = {};
         let isRiddleActive = false;
+        let canMove = true;
 
         const riddles = { 1: {}, 4: {}, 7: {}, 13: {} };
         const mapConnections = {
@@ -414,6 +416,12 @@
         }
 
         function move(dx, dy) {
+            if (!canMove) return;
+
+            // Immediately prevent the next move and set a cooldown
+            canMove = false;
+            setTimeout(() => { canMove = true; }, 80); // 80ms cooldown
+
             const roomBeforeMove = roomsData[currentRoom];
             const newX = playerX + dx;
             const newY = playerY + dy;
