@@ -46,6 +46,10 @@
             border-radius: 4px;
             font-size: 14px;
             font-family: 'unixel', monospace; /* Ensure buttons also use the font */
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none;     /* IE 10+ */
+            user-select: none;         /* Standard */
+            touch-action: manipulation; /* Disables double-tap to zoom */
         }
         .controls-container #k {
             width: 80px;
@@ -117,14 +121,25 @@
             <tbody>
                 <tr>
                     <td></td>
-                    <!-- 4. Add data-lang-key to all translatable elements -->
-                    <td><button id="up" data-lang-key="move_up">↑</button></td>
+                    <td><button id="up" 
+                        onmousedown="handleButtonPress(0, -1, 'ArrowUp', event)" onmouseup="handleButtonRelease('ArrowUp')" onmouseleave="handleButtonRelease('ArrowUp')"
+                        ontouchstart="handleButtonPress(0, -1, 'ArrowUp', event)" ontouchend="handleButtonRelease('ArrowUp')"
+                        data-lang-key="move_up">↑</button></td>
                     <td></td>
                 </tr>
                 <tr>
-                    <td><button id="left" data-lang-key="move_left">←</button></td>
-                    <td><button id="down" data-lang-key="move_down">↓</button></td>
-                    <td><button id="right" data-lang-key="move_right">→</button></td>
+                    <td><button id="left" 
+                        onmousedown="handleButtonPress(-1, 0, 'ArrowLeft', event)" onmouseup="handleButtonRelease('ArrowLeft')" onmouseleave="handleButtonRelease('ArrowLeft')"
+                        ontouchstart="handleButtonPress(-1, 0, 'ArrowLeft', event)" ontouchend="handleButtonRelease('ArrowLeft')"
+                        data-lang-key="move_left">←</button></td>
+                    <td><button id="down" 
+                        onmousedown="handleButtonPress(0, 1, 'ArrowDown', event)" onmouseup="handleButtonRelease('ArrowDown')" onmouseleave="handleButtonRelease('ArrowDown')"
+                        ontouchstart="handleButtonPress(0, 1, 'ArrowDown', event)" ontouchend="handleButtonRelease('ArrowDown')"
+                        data-lang-key="move_down">↓</button></td>
+                    <td><button id="right" 
+                        onmousedown="handleButtonPress(1, 0, 'ArrowRight', event)" onmouseup="handleButtonRelease('ArrowRight')" onmouseleave="handleButtonRelease('ArrowRight')"
+                        ontouchstart="handleButtonPress(1, 0, 'ArrowRight', event)" ontouchend="handleButtonRelease('ArrowRight')"
+                        data-lang-key="move_right">→</button></td>
                 </tr>
                 <tr>
                     <td></td>
@@ -528,7 +543,8 @@
             }, 160);
         }
         
-        function handleButtonPress(dx, dy, key) {
+        function handleButtonPress(dx, dy, key, e) {
+            if (e) e.preventDefault(); // Prevent default browser actions like zoom
             if (isRiddleActive) return;
             startMove(dx, dy, key);
         }
