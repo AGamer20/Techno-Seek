@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dot Game</title>
+    <style>
+        @font-face {
+        font-family: 'unixel'; /* Give your font a name */
+        src:
+            url('unixel.woff2') format('woff2'),
+            url('unixel.ttf') format('truetype');
+
+        /* Optional: You can also specify font-weight and font-style */
+        font-weight: normal;
+        font-style: normal;
+        }
+        body {
+            background: #000;
+            color: #fff;
+            text-align: center;
+            font-family: 'unixel', sans-serif;
+            overflow: hidden; /* Prevents scrollbars */
+        }
+        h1, p, button {
+            font-family: 'unixel', sans-serif;
+        }
+        #game-container {
+            position: relative; /* This is the anchor for the overlay */
+            width: 202px; /* Canvas width + borders */
+            margin: 0 auto;
+        }
+        canvas {
+            border: 1px solid #fff;
+        }
+        .controls-container table {
+            margin: 10px auto;
+            border-spacing: 3px;
+        }
+        .controls-container button {
+            background: #fff;
+            color: #000;
+            width: 50px;
+            height: 35px;
+            border: 2px solid #555;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .controls-container #k {
+            width: 80px;
+        }
+
+        /* --- New Styles for Immersive Riddle Box --- */
+        #riddle-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 180px;
+            padding: 10px;
+            background-color: #000;
+            border: 1px solid #fff;
+            text-align: center;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            gap: 10px; /* Space between elements */
+            z-index: 10;
+        }
+        #riddle-text {
+            margin: 0;
+            white-space: pre-wrap; /* Allows text to wrap */
+        }
+        #riddle-input {
+            background-color: #000;
+            color: #fff;
+            border: 1px solid #fff;
+            padding: 5px;
+            font-family: monospace;
+            text-align: center;
+        }
+        #riddle-input:focus {
+            outline: none;
+            border-color: yellow;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="c" width="200" height="200"></canvas>
+
+        <!-- Riddle Box Overlay -->
+        <div id="riddle-container">
+            <p id="riddle-text"></p>
+            <input type="text" id="riddle-input" />
+            <button id="riddle-submit">Submit</button>
+        </div>
+    </div>
+    
+    <div class="controls-container">
+        <table>
+            <tbody>
+                <tr>
+                    <td></td>
+                    <td><button id="up" onmousedown="handleButtonPress(0, -1, 'ArrowUp')" onmouseup="handleButtonRelease('ArrowUp')" onmouseleave="handleButtonRelease('ArrowUp')">↑</button></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td><button id="left" onmousedown="handleButtonPress(-1, 0, 'ArrowLeft')" onmouseup="handleButtonRelease('ArrowLeft')" onmouseleave="handleButtonRelease('ArrowLeft')">←</button></td>
+                    <td><button id="down" onmousedown="handleButtonPress(0, 1, 'ArrowDown')" onmouseup="handleButtonRelease('ArrowDown')" onmouseleave="handleButtonRelease('ArrowDown')">↓</button></td>
+                    <td><button id="right" onmousedown="handleButtonPress(1, 0, 'ArrowRight')" onmouseup="handleButtonRelease('ArrowRight')" onmouseleave="handleButtonRelease('ArrowRight')">→</button></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td><button id="k" style="visibility: hidden;" onclick="takeKey()">Take Key</button></td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        const pixelSize = 10;
+        let currentRoom = 1;
+        let playerX = 1;
+        let playerY = 10;
+        let keysPicked = {};
+        
+        let keysDown = {};
+        let keyPressTimers = {};
+        let isKeyPressed = {};
+        let isRiddleActive = false; // Prevents movement when riddle is open
+
+        const riddles = {
+            1: {riddle: 'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?', answer: 'a map', explanation: 'Correct! The answer is a map.'},
+            4: {riddle: 'What has an eye, but cannot see?', answer: 'a needle', explanation: 'Correct! A needle has an eye for the thread.'},
+            7: {riddle: 'I am always hungry, I must always be fed. The finger I lick will soon turn red. What am I?', answer: 'fire', explanation: 'Correct! The answer is fire.'},
+            13: {riddle: 'I have a bark, but I cannot bite. I have leaves, but I am not a book. What am I?', answer: 'a tree', explanation: 'Correct! The answer is a tree.'}
+        };
+        
+        const mapConnections = {
+            1: { left: { to: 2, key: '1' } },
+            2: { right: { to: 1, key: null }, left: { to: 6, key: '4' }, top: { to: 3, key: null }, bottom: { to: 5, key: null } },
+            3: { bottom: { to: 2, key: null }, left: { to: 4, key: null } },
+            4: { right: { to: 3, key: null }, bottom: { to: 6, key: null } },
+            5: { top: { to: 2, key: null }, left: { to: 7, key: '4' }, right: { to: 9, key: '7', special: 'room5to9' }, bottom: { to: 8, key: null } },
+            6: { top: { to: 4, key: null }, right: { to: 2, key: '4' }, bottom: { to: 7, key: null } },
+            7: { top: { to: 6, key: null }, right: { to: 5, key: '4' } },
+            8: { top: { to: 5, key: null }, right: { to: 10, key: '7' }, bottom: { to: null, key: '13' } },
+            9: { left: { to: 5, key: null, special: 'room9to5' }, right: { to: 12, key: null }, bottom: { to: 10, key: '7' } },
+            10: { left: { to: 8, key: '7' }, top: { to: 9, key: '7' }, right: { to: 11, key: null } },
+            11: { left: { to: 10, key: null }, top: { to: 12, key: null } },
+            12: { left: { to: 9, key: null }, bottom: { to: 11, key: null }, top: { to: 13, key: null } },
+            13: { bottom: { to: 12, key: null } }
+        };
+
+        const roomsData = { 1:{"walls":[{"x":0,"y":1,"orientation":"h","length":15,"isBlocking":true,"type":"blocking"},{"x":0,"y":16,"orientation":"h","length":18,"isBlocking":true,"type":"blocking"},{"x":18,"y":16,"orientation":"v","length":4,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":12,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":10,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":10,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":6,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":8,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":8,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":9,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"}],"doors":[["left",12]],"fullDoors":[],"key":[17,13],"bars":[{"x":15,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":16,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":16,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":16,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":1,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":2,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":5,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":7,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":9,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]}, 2:{"walls":[{"x":19,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":18,"y":10,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":19,"y":11,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":19,"y":15,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":18,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":18,"y":10,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":12,"y":15,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":12,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"},{"x":12,"y":15,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":8,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":6,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":4,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":2,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["top","bottom","left"],"key":null,"bars":[{"x":12,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":11,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":13,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":10,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"}],"trees":[[7,2],[7,10],[7,6],[7,18]],"moons":[]}, 3:{"walls":[{"x":6,"y":3,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":12,"y":8,"orientation":"h","length":8,"isBlocking":true,"type":"blocking"},{"x":12,"y":8,"orientation":"v","length":12,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":4,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":12,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":14,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"}],"doors":[["left",12]],"fullDoors":["bottom"],"key":null,"bars":[{"x":6,"y":3,"orientation":"v","length":17,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":14,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":5,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":19,"y":11,"orientation":"v","length":9,"isBlocking":true,"type":"blocking"}],"trees":[[9,5],[7,15],[7,10],[8,5]],"moons":[]}, 4:{"walls":[{"x":16,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":5,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":5,"y":1,"orientation":"h","length":7,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["bottom"],"key":[8,0],"bars":[{"x":18,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":18,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":18,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":5,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":11,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":6,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":7,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":9,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":10,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"},{"x":8,"y":2,"orientation":"v","length":17,"isBlocking":false,"type":"normal"},{"x":3,"y":16,"orientation":"h","length":11,"isBlocking":false,"type":"normal"},{"x":3,"y":7,"orientation":"h","length":11,"isBlocking":false,"type":"normal"}],"trees":[],"moons":[]}, 5:{"walls":[{"x":8,"y":1,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":5,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":7,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":12,"y":0,"orientation":"v","length":16,"isBlocking":true,"type":"blocking"},{"x":17,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":17,"y":15,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["top","left","bottom","right"],"key":null,"bars":[{"x":8,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":14,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":12,"y":13,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":6,"y":19,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":6,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":12,"y":12,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":19,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"}],"trees":[[7,12],[7,7],[7,3],[11,17],[8,14],[17,17]],"moons":[]}, 6:{"walls":[{"x":16,"y":1,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":5,"y":4,"orientation":"h","length":7,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":13,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":10,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":4,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":4,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":2,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":7,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":9,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":14,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":18,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"}],"doors":[],"fullDoors":["bottom","top","right"],"key":null,"bars":[{"x":16,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":18,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":8,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":9,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":10,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":7,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":6,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":6,"y":4,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":11,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":5,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":13,"y":7,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":13,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":13,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":0,"y":5,"orientation":"h","length":16,"isBlocking":false,"type":"normal"},{"x":2,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":7,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":0,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":14,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":19,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"}],"trees":[[13,16],[12,18],[12,17],[13,18],[14,17],[14,16],[11,17],[7,16],[2,18],[1,17],[2,16],[3,17],[3,16],[12,16]],"moons":[]}, 7:{"walls":[{"x":15,"y":1,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":3,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":8,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":13,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":16,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":18,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":8,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":11,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"h","length":3,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["top","right"],"key":[7,5],"bars":[{"x":15,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":19,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"trees":[[1,10],[2,10],[3,11],[2,12],[1,11],[12,10],[10,11],[11,10],[13,11],[12,12],[11,13],[10,12],[7,9],[6,8],[8,8],[9,7],[10,6],[10,4],[10,5],[9,3],[8,3],[7,2],[6,2],[5,3],[4,6],[3,6],[4,5],[4,4]],"moons":[]}, 8:{"walls":[{"x":14,"y":8,"orientation":"h","length":6,"isBlocking":true,"type":"blocking"},{"x":14,"y":8,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":6,"y":14,"orientation":"h","length":14,"isBlocking":true,"type":"blocking"},{"x":11,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":7,"y":9,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":7,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":6,"y":5,"orientation":"v","length":9,"isBlocking":false,"type":"normal"},{"x":6,"y":14,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":11,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":0,"y":15,"orientation":"h","length":4,"isBlocking":false,"type":"normal"},{"x":0,"y":12,"orientation":"h","length":4,"isBlocking":false,"type":"normal"},{"x":1,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":3,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":2,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":13,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"doors":[["bottom",1]],"fullDoors":["top","right"],"key":null,"bars":[{"x":6,"y":5,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":11,"y":12,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":13,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":3,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":19,"y":14,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]}, 9:{"walls":[{"x":0,"y":15,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":0,"y":11,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":9,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":11,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":18,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"}],"doors":[["left",12]],"fullDoors":["left","bottom","right"],"key":null,"bars":[{"x":0,"y":19,"orientation":"h","length":20,"isBlocking":false,"type":"normal"},{"x":2,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"trees":[[12,17],[14,16],[7,16],[5,17],[19,17]],"moons":[]}, 10:{"walls":[{"x":0,"y":14,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":8,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":0,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":3,"y":5,"orientation":"v","length":9,"isBlocking":false,"type":"normal"},{"x":3,"y":9,"orientation":"h","length":17,"isBlocking":true,"type":"blocking"},{"x":0,"y":17,"orientation":"h","length":20,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["left","right","top"],"key":null,"bars":[{"x":19,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":17,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":15,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":13,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":11,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":9,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":0,"y":5,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":7,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":5,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]}, 11:{"walls":[{"x":0,"y":14,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":17,"y":11,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":5,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":5,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":0,"y":17,"orientation":"h","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":9,"orientation":"h","length":13,"isBlocking":true,"type":"blocking"}],"doors":[],"fullDoors":["top","left"],"key":null,"bars":[{"x":14,"y":0,"orientation":"v","length":14,"isBlocking":false,"type":"normal"},{"x":19,"y":13,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":12,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":11,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":3,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":6,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":10,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":12,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":4,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":2,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":0,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"}],"trees":[[15,4],[15,9],[17,1]],"moons":[[18,7]]}, 12:{"walls":[{"x":2,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":0,"y":15,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":4,"y":0,"orientation":"v","length":15,"isBlocking":true,"type":"blocking"},{"x":5,"y":14,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":12,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":9,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":7,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":4,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":2,"orientation":"h","length":3,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["left","bottom","top"],"key":null,"bars":[{"x":14,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":19,"orientation":"h","length":8,"isBlocking":false,"type":"normal"},{"x":2,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":19,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"}],"trees":[[0,16],[6,16],[6,10],[5,5],[6,0],[17,4],[18,2],[17,10],[17,7],[18,13],[17,16],[18,18],[17,14],[17,0],[17,12],[17,9],[17,5],[17,17],[17,3],[15,18],[15,14],[15,10],[15,6],[15,2],[18,9],[18,6],[18,8],[19,11],[19,16],[19,4],[19,1],[19,5]],"moons":[]}, 13:{"walls":[{"x":5,"y":19,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":17,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":13,"orientation":"v","length":7,"isBlocking":true,"type":"blocking"},{"x":0,"y":13,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":17,"y":18,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":19,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":18,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":18,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":1,"y":7,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":3,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":4,"y":9,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":10,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":6,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":5,"orientation":"h","length":1,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["bottom"],"key":[12,7],"bars":[{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"},{"x":5,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":14,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":14,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":14,"y":15,"orientation":"v","length":5,"isBlocking":false,"type":"normal"},{"x":14,"y":15,"orientation":"h","length":6,"isBlocking":false,"type":"normal"},{"x":19,"y":13,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":12,"orientation":"h","length":11,"isBlocking":false,"type":"normal"},{"x":9,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":1,"y":9,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":1,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":5,"y":5,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":3,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":3,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":1,"y":0,"orientation":"h","length":19,"isBlocking":true,"type":"blocking"}],"trees":[[6,15],[18,16],[15,16],[15,18],[7,10],[15,10],[18,10],[6,3],[7,6],[10,2],[17,2],[19,3],[13,2],[18,6]],"moons":[]} };
+
+        // --- Riddle Box Elements ---
+        const riddleContainer = document.getElementById('riddle-container');
+        const riddleText = document.getElementById('riddle-text');
+        const riddleInput = document.getElementById('riddle-input');
+        const riddleSubmit = document.getElementById('riddle-submit');
+
+        // Draw the game state
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 200, 200);
+
+            const room = roomsData[currentRoom] || {walls: [], doors: [], fullDoors: [], key: null, bars: [], trees: [], moons: []};
+
+            room.walls.forEach(w => {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = w.isBlocking ? 2 : 1;
+                ctx.beginPath();
+                ctx.moveTo(w.x * pixelSize, w.y * pixelSize);
+                if (w.orientation === 'h') ctx.lineTo((w.x + w.length) * pixelSize, w.y * pixelSize);
+                else ctx.lineTo(w.x * pixelSize, (w.y + w.length) * pixelSize);
+                ctx.stroke();
+            });
+
+            room.bars.forEach(b => {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = b.isBlocking ? 2 : 1;
+                ctx.beginPath();
+                if (b.orientation === 'v') {
+                    ctx.moveTo(b.x * pixelSize + 5, b.y * pixelSize);
+                    ctx.lineTo(b.x * pixelSize + 5, (b.y + b.length) * pixelSize);
+                } else {
+                    ctx.moveTo(b.x * pixelSize, b.y * pixelSize + 5);
+                    ctx.lineTo((b.x + b.length) * pixelSize, b.y * pixelSize + 5);
+                }
+                ctx.stroke();
+            });
+
+            room.trees.forEach(t => {
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(t[0] * pixelSize + 4, t[1] * pixelSize + pixelSize, 2, 5);
+                ctx.fillStyle = '#228B22';
+                ctx.fillRect(t[0] * pixelSize, t[1] * pixelSize, pixelSize, pixelSize + 5);
+            });
+
+            room.moons.forEach(m => {
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(m[0] * pixelSize + 5, m[1] * pixelSize + 5, 5, 0.5 * Math.PI, 1.5 * Math.PI, false);
+                ctx.arc(m[0] * pixelSize + 7, m[1] * pixelSize + 5, 5, 1.5 * Math.PI, 0.5 * Math.PI, true);
+                ctx.fill();
+            });
+
+            if (room.key && !keysPicked[currentRoom]) {
+                const [kx, ky] = room.key;
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                ctx.arc(kx * pixelSize + 5, ky * pixelSize + 3, 3, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillRect(kx * pixelSize + 4, ky * pixelSize + 6, 2, 6);
+                ctx.fillRect(kx * pixelSize + 2, ky * pixelSize + 10, 2, 2);
+                ctx.fillRect(kx * pixelSize + 6, ky * pixelSize + 10, 2, 2);
+            }
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ['left', 'right', 'top', 'bottom'].forEach(edge => {
+                if (room.fullDoors.includes(edge)) {
+                    ctx.beginPath();
+                    if (edge === 'left') { ctx.moveTo(5, 0); ctx.lineTo(5, 200); }
+                    else if (edge === 'right') { ctx.moveTo(195, 0); ctx.lineTo(195, 200); }
+                    else if (edge === 'top') { ctx.moveTo(0, 5); ctx.lineTo(200, 5); }
+                    else { ctx.moveTo(0, 195); ctx.lineTo(200, 195); }
+                    ctx.stroke();
+                } else {
+                    let edgeDoors = room.doors.filter(d => d[0] === edge);
+                    let wallSegments = [{start: 0, end: 20}];
+                    edgeDoors.forEach(d => {
+                        let pos = d[1];
+                        for (let i = 0; i < wallSegments.length; i++) {
+                            let seg = wallSegments[i];
+                            if (pos >= seg.start && pos < seg.end) {
+                                let newSeg = {start: pos + 2, end: seg.end};
+                                seg.end = pos;
+                                wallSegments.splice(i + 1, 0, newSeg);
+                                break;
+                            }
+                        }
+                    });
+                    ctx.beginPath();
+                    wallSegments.forEach(seg => {
+                        if (seg.start < seg.end) {
+                             if (edge === 'left') { ctx.moveTo(5, seg.start * pixelSize); ctx.lineTo(5, seg.end * pixelSize); }
+                             else if (edge === 'right') { ctx.moveTo(195, seg.start * pixelSize); ctx.lineTo(195, seg.end * pixelSize); }
+                             else if (edge === 'top') { ctx.moveTo(seg.start * pixelSize, 5); ctx.lineTo(seg.end * pixelSize, 5); }
+                             else { ctx.moveTo(seg.start * pixelSize, 195); ctx.lineTo(seg.end * pixelSize, 195); }
+                        }
+                    });
+                    ctx.stroke();
+                }
+            });
+
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(playerX * pixelSize, playerY * pixelSize, pixelSize, pixelSize);
+        }
+
+        function move(dx, dy) {
+            const roomBeforeMove = roomsData[currentRoom];
+            const newX = playerX + dx;
+            const newY = playerY + dy;
+
+            let blocked = false;
+            const blockingElements = [...(roomBeforeMove.walls || []), ...(roomBeforeMove.bars || [])].filter(e => e.isBlocking);
+
+            if (dx === 1) blockingElements.filter(e=>e.orientation==='v').forEach(e=>{if(e.x===newX && newY>=e.y && newY<e.y+e.length)blocked=true;});
+            else if (dx === -1) blockingElements.filter(e=>e.orientation==='v').forEach(e=>{if(e.x===playerX && newY>=e.y && newY<e.y+e.length)blocked=true;});
+            else if (dy === 1) blockingElements.filter(e=>e.orientation==='h').forEach(e=>{if(e.y===newY && newX>=e.x && newX<e.x+e.length)blocked=true;});
+            else if (dy === -1) blockingElements.filter(e=>e.orientation==='h').forEach(e=>{if(e.y===playerY && newX>=e.x && newX<e.x+e.length)blocked=true;});
+
+            (roomBeforeMove.trees || []).forEach(t => { if (newX === t[0] && (newY === t[1] || newY === t[1] + 1)) blocked = true; });
+
+            if (blocked) return;
+
+            playerX = newX;
+            playerY = newY;
+
+            let direction = null;
+            if (playerX < 0) { direction = 'left'; playerX = 19; } 
+            else if (playerX > 19) { direction = 'right'; playerX = 0; } 
+            else if (playerY < 0) { direction = 'top'; playerY = 19; } 
+            else if (playerY > 19) { direction = 'bottom'; playerY = 0; } 
+            else { updateKeyButton(); draw(); return; }
+
+            const conn = mapConnections[currentRoom]?.[direction];
+            if (!conn) { bounceBack(direction); return; }
+
+            const pos = (direction === 'top' || direction === 'bottom') ? playerX : playerY;
+            const hasDoor = (roomBeforeMove.fullDoors && roomBeforeMove.fullDoors.includes(direction)) || 
+                          (roomBeforeMove.doors && roomBeforeMove.doors.some(d => d[0] === direction && pos >= d[1] && pos < d[1] + 2));
+
+            if (!hasDoor) {
+                bounceBack(direction);
+                return;
+            }
+            
+            if (conn.special === 'room5to9') {
+                const isUsingRegularDoor = playerY >= 12 && playerY < 14;
+                if (!isUsingRegularDoor && conn.key && !keysPicked[conn.key]) {
+                    keysDown = {};
+                    alert('The door is locked.');
+                    bounceBack(direction);
+                    return;
+                }
+            } else if (conn.special === 'room9to5') {
+                 // No key check needed
+            } else if (conn.key && !keysPicked[conn.key]) {
+                keysDown = {};
+                alert('The door is locked.');
+                bounceBack(direction);
+                return;
+            }
+
+            if (conn.to === null) {
+                keysDown = {};
+                alert('You win!');
+                return;
+            }
+
+            currentRoom = conn.to;
+            updateKeyButton();
+            draw();
+        }
+
+        function bounceBack(direction) {
+            if (direction === 'left') playerX = 0;
+            else if (direction === 'right') playerX = 19;
+            else if (direction === 'top') playerY = 0;
+            else if (direction === 'bottom') playerY = 19;
+            draw();
+        }
+
+        function showRiddle() {
+            isRiddleActive = true;
+            const riddle = riddles[currentRoom];
+            riddleText.innerText = riddle.riddle;
+            riddleContainer.style.display = 'flex';
+            riddleInput.focus();
+        }
+
+        function hideRiddle() {
+            riddleInput.value = '';
+            riddleContainer.style.display = 'none';
+            isRiddleActive = false;
+        }
+
+        function checkRiddleAnswer() {
+            const riddle = riddles[currentRoom];
+            const userAnswer = riddleInput.value.trim().toLowerCase();
+            
+            if (userAnswer === riddle.answer) {
+                alert(riddle.explanation);
+                keysPicked[currentRoom] = true;
+                hideRiddle();
+                updateKeyButton();
+                draw();
+            } else {
+                alert('Wrong!');
+                riddleInput.value = '';
+                riddleInput.focus();
+            }
+        }
+        
+        function takeKey() {
+            if (riddles[currentRoom]) {
+                showRiddle();
+            }
+        }
+
+        function updateKeyButton() {
+            const room = roomsData[currentRoom];
+            const show = room && room.key && !keysPicked[currentRoom] && playerX === room.key[0] && playerY === room.key[1];
+            document.getElementById('k').style.visibility = show ? 'visible' : 'hidden';
+        }
+        
+        function startMove(dx, dy, key) {
+            move(dx, dy);
+            keyPressTimers[key] = setTimeout(() => {
+                keysDown[key] = true;
+            }, 160);
+        }
+        
+        function handleButtonPress(dx, dy, key) {
+            if (isRiddleActive) return;
+            startMove(dx, dy, key);
+        }
+        function handleButtonRelease(key) {
+            clearTimeout(keyPressTimers[key]);
+            delete keysDown[key];
+        }
+
+        document.addEventListener('keydown', e => {
+            if (isRiddleActive) return;
+            if (isKeyPressed[e.key] || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+            e.preventDefault();
+            isKeyPressed[e.key] = true;
+            
+            if (e.key === 'ArrowUp') startMove(0, -1, e.key);
+            if (e.key === 'ArrowDown') startMove(0, 1, e.key);
+            if (e.key === 'ArrowLeft') startMove(-1, 0, e.key);
+            if (e.key === 'ArrowRight') startMove(1, 0, e.key);
+        });
+
+        document.addEventListener('keyup', e => {
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+            e.preventDefault();
+            clearTimeout(keyPressTimers[e.key]);
+            delete isKeyPressed[e.key];
+            delete keysDown[e.key];
+        });
+
+        // Event listeners for the riddle box
+        riddleSubmit.addEventListener('click', checkRiddleAnswer);
+        riddleInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                checkRiddleAnswer();
+            }
+        });
+
+        setInterval(() => {
+            if (isRiddleActive) return; // Pause movement
+            if (keysDown['ArrowUp']) move(0, -1);
+            if (keysDown['ArrowDown']) move(0, 1);
+            if (keysDown['ArrowLeft']) move(-1, 0);
+            if (keysDown['ArrowRight']) move(1, 0);
+        }, 120);
+
+        draw();
+        updateKeyButton();
+    </script>
+</body>
+</html>
