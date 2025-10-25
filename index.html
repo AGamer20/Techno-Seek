@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dot Game</title>
+    <title>Techno Seek</title>
+    <link rel="icon" type="image/png" href="Techno-Seek-Logo.png">
+    <!-- 1. Import an Arabic-compatible font (like Tajawal from Google Fonts) -->
     <style>
         @font-face {
         font-family: 'unixel'; /* Give your font a name */
@@ -20,12 +22,12 @@
             font-family: 'unixel', sans-serif;
             overflow: hidden; /* Prevents scrollbars */
         }
-        h1, p, button {
+        h1, p, button, #k {
             font-family: 'unixel', sans-serif;
         }
         #game-container {
-            position: relative; /* This is the anchor for the overlay */
-            width: 202px; /* Canvas width + borders */
+            position: relative;
+            width: 202px;
             margin: 0 auto;
         }
         canvas {
@@ -43,12 +45,12 @@
             border: 2px solid #555;
             border-radius: 4px;
             font-size: 14px;
+            font-family: 'unixel', monospace; /* Ensure buttons also use the font */
         }
         .controls-container #k {
             width: 80px;
         }
 
-        /* --- New Styles for Immersive Riddle Box --- */
         #riddle-container {
             position: absolute;
             top: 50%;
@@ -59,38 +61,54 @@
             background-color: #000;
             border: 1px solid #fff;
             text-align: center;
-            display: none; /* Hidden by default */
+            display: none;
             flex-direction: column;
-            gap: 10px; /* Space between elements */
+            gap: 10px;
             z-index: 10;
         }
         #riddle-text {
             margin: 0;
-            white-space: pre-wrap; /* Allows text to wrap */
+            white-space: pre-wrap;
         }
         #riddle-input {
             background-color: #000;
             color: #fff;
             border: 1px solid #fff;
             padding: 5px;
-            font-family: monospace;
+            font-family: 'unixel', monospace;
             text-align: center;
         }
         #riddle-input:focus {
             outline: none;
             border-color: yellow;
         }
+
+        /* --- 3. CSS for the Language Toggle Button --- */
+        #language-toggle-container {
+            position: fixed; /* Keeps it in place when scrolling */
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%); /* Centers the container */
+            padding: 10px;
+            z-index: 20; /* Ensures it's on top of everything */
+        }
+        #lang-toggle-btn {
+            background: #000;
+            color: #fff;
+            border: 1px solid #fff;
+            border-radius: 5px;
+            padding: 8px 15px;
+            cursor: pointer;
+        }
     </style>
 </head>
-<body>
+<body dir="ltr"> <!-- Start with LTR direction -->
     <div id="game-container">
         <canvas id="c" width="200" height="200"></canvas>
-
-        <!-- Riddle Box Overlay -->
         <div id="riddle-container">
             <p id="riddle-text"></p>
             <input type="text" id="riddle-input" />
-            <button id="riddle-submit">Submit</button>
+            <button id="riddle-submit" data-lang-key="submit">Submit</button>
         </div>
     </div>
     
@@ -99,24 +117,138 @@
             <tbody>
                 <tr>
                     <td></td>
-                    <td><button id="up" onmousedown="handleButtonPress(0, -1, 'ArrowUp')" onmouseup="handleButtonRelease('ArrowUp')" onmouseleave="handleButtonRelease('ArrowUp')">↑</button></td>
+                    <!-- 4. Add data-lang-key to all translatable elements -->
+                    <td><button id="up" data-lang-key="move_up">↑</button></td>
                     <td></td>
                 </tr>
                 <tr>
-                    <td><button id="left" onmousedown="handleButtonPress(-1, 0, 'ArrowLeft')" onmouseup="handleButtonRelease('ArrowLeft')" onmouseleave="handleButtonRelease('ArrowLeft')">←</button></td>
-                    <td><button id="down" onmousedown="handleButtonPress(0, 1, 'ArrowDown')" onmouseup="handleButtonRelease('ArrowDown')" onmouseleave="handleButtonRelease('ArrowDown')">↓</button></td>
-                    <td><button id="right" onmousedown="handleButtonPress(1, 0, 'ArrowRight')" onmouseup="handleButtonRelease('ArrowRight')" onmouseleave="handleButtonRelease('ArrowRight')">→</button></td>
+                    <td><button id="left" data-lang-key="move_left">←</button></td>
+                    <td><button id="down" data-lang-key="move_down">↓</button></td>
+                    <td><button id="right" data-lang-key="move_right">→</button></td>
                 </tr>
                 <tr>
                     <td></td>
-                    <td><button id="k" style="visibility: hidden;" onclick="takeKey()">Take Key</button></td>
+                    <td><button id="k" style="visibility: hidden;" onclick="takeKey()" data-lang-key="take_key">Take Key</button></td>
                     <td></td>
                 </tr>
             </tbody>
         </table>
     </div>
 
+    <!-- 5. HTML for the language toggle button -->
+    <div id="language-toggle-container">
+        <button id="lang-toggle-btn"></button>
+    </div>
+
     <script>
+        // --- 6. JAVASCRIPT FOR LANGUAGE TOGGLE ---
+
+        // Object to hold all translations
+        const translations = {
+            en: {
+                // UI Text
+                move_up: '↑',
+                move_left: '←',
+                move_right: '→',
+                move_down: '↓',
+                take_key: 'Take Key',
+                submit: 'Submit',
+                toggle_lang: 'العربية',
+                
+                // Riddles & Answers
+                riddle_1: 'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?',
+                answer_1: 'a map',
+                explanation_1: 'Correct! The answer is a map.',
+                
+                riddle_4: 'What has an eye, but cannot see?',
+                answer_4: 'a needle',
+                explanation_4: 'Correct! A needle has an eye for the thread.',
+                
+                riddle_7: 'I am always hungry, I must always be fed. The finger I lick will soon turn red. What am I?',
+                answer_7: 'fire',
+                explanation_7: 'Correct! The answer is fire.',
+
+                riddle_13: 'I have a bark, but I cannot bite. I have leaves, but I am not a book. What am I?',
+                answer_13: 'a tree',
+                explanation_13: 'Correct! The answer is a tree.',
+
+                // Game Messages
+                locked_door: 'The door is locked.',
+                wrong_answer: 'Wrong!',
+                you_win: 'You win!'
+            },
+            ar: {
+                // UI Text
+                move_up: '↑',
+                move_left: '←',
+                move_right: '→',
+                move_down: '↓',
+                take_key: 'خذ المفتاح',
+                submit: 'إرسال',
+                toggle_lang: 'English',
+                
+                // Riddles & Answers
+                riddle_1: 'لدي مدن بلا بيوت، وجبال بلا أشجار، ومياه بلا سمك. فما أنا؟',
+                answer_1: 'خريطة',
+                explanation_1: 'صحيح! الجواب هو الخريطة.',
+
+                riddle_4: 'ما هو الشيء الذي له عين ولكنه لا يرى؟',
+                answer_4: 'إبرة',
+                explanation_4: 'صحيح! الإبرة لها عين للخيط.',
+
+                riddle_7: 'أنا دائما جائع، ويجب إطعامي دائماً. الإصبع الذي ألعقه سيحمر قريباً. فما أنا؟',
+                answer_7: 'نار',
+                explanation_7: 'صحيح! الجواب هو النار.',
+
+                riddle_13: 'لدي لحاء ولكن لا أعض، ولدي أوراق ولست كتاباً. فما أنا؟',
+                answer_13: 'شجرة',
+                explanation_13: 'صحيح! الجواب هو الشجرة.',
+
+                // Game Messages
+                locked_door: 'الباب مغلق.',
+                wrong_answer: 'إجابة خاطئة!',
+                you_win: 'لقد فزت!'
+            }
+        };
+
+        let currentLanguage;
+        const urlParams = new URLSearchParams(window.location.search);
+        const langParam = urlParams.get('lang');
+
+        if (langParam === 'en' || langParam === 'ar') {
+            currentLanguage = langParam;
+            localStorage.setItem('dotGameLanguage', currentLanguage); 
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            currentLanguage = localStorage.getItem('dotGameLanguage') || 'en';
+        }
+
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            localStorage.setItem('dotGameLanguage', lang);
+
+            // Set page direction
+            document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+            // Update all elements with a data-lang-key attribute
+            document.querySelectorAll('[data-lang-key]').forEach(element => {
+                const key = element.dataset.langKey;
+                if (translations[lang][key]) {
+                    element.innerText = translations[lang][key];
+                }
+            });
+
+            // Update the toggle button's text
+            document.getElementById('lang-toggle-btn').innerText = translations[lang].toggle_lang;
+        }
+
+        function toggleLanguage() {
+            const newLang = currentLanguage === 'en' ? 'ar' : 'en';
+            setLanguage(newLang);
+        }
+        
+        // --- End of Language Toggle Script ---
+
         const canvas = document.getElementById('c');
         const ctx = canvas.getContext('2d');
         const pixelSize = 10;
@@ -128,15 +260,9 @@
         let keysDown = {};
         let keyPressTimers = {};
         let isKeyPressed = {};
-        let isRiddleActive = false; // Prevents movement when riddle is open
+        let isRiddleActive = false;
 
-        const riddles = {
-            1: {riddle: 'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?', answer: 'a map', explanation: 'Correct! The answer is a map.'},
-            4: {riddle: 'What has an eye, but cannot see?', answer: 'a needle', explanation: 'Correct! A needle has an eye for the thread.'},
-            7: {riddle: 'I am always hungry, I must always be fed. The finger I lick will soon turn red. What am I?', answer: 'fire', explanation: 'Correct! The answer is fire.'},
-            13: {riddle: 'I have a bark, but I cannot bite. I have leaves, but I am not a book. What am I?', answer: 'a tree', explanation: 'Correct! The answer is a tree.'}
-        };
-        
+        const riddles = { 1: {}, 4: {}, 7: {}, 13: {} };
         const mapConnections = {
             1: { left: { to: 2, key: '1' } },
             2: { right: { to: 1, key: null }, left: { to: 6, key: '4' }, top: { to: 3, key: null }, bottom: { to: 5, key: null } },
@@ -153,15 +279,27 @@
             13: { bottom: { to: 12, key: null } }
         };
 
-        const roomsData = { 1:{"walls":[{"x":0,"y":1,"orientation":"h","length":15,"isBlocking":true,"type":"blocking"},{"x":0,"y":16,"orientation":"h","length":18,"isBlocking":true,"type":"blocking"},{"x":18,"y":16,"orientation":"v","length":4,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":12,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":10,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":10,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":6,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":8,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":8,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":9,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"}],"doors":[["left",12]],"fullDoors":[],"key":[17,13],"bars":[{"x":15,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":16,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":16,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":16,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":1,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":2,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":5,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":7,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":9,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]}, 2:{"walls":[{"x":19,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":18,"y":10,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":19,"y":11,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":19,"y":15,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":18,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":18,"y":10,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":12,"y":15,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":12,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"},{"x":12,"y":15,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":8,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":6,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":4,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":2,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["top","bottom","left"],"key":null,"bars":[{"x":12,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":11,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":13,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":10,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"}],"trees":[[7,2],[7,10],[7,6],[7,18]],"moons":[]}, 3:{"walls":[{"x":6,"y":3,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":12,"y":8,"orientation":"h","length":8,"isBlocking":true,"type":"blocking"},{"x":12,"y":8,"orientation":"v","length":12,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":4,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":12,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":14,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"}],"doors":[["left",12]],"fullDoors":["bottom"],"key":null,"bars":[{"x":6,"y":3,"orientation":"v","length":17,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":14,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":5,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":19,"y":11,"orientation":"v","length":9,"isBlocking":true,"type":"blocking"}],"trees":[[9,5],[7,15],[7,10],[8,5]],"moons":[]}, 4:{"walls":[{"x":16,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":5,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":5,"y":1,"orientation":"h","length":7,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["bottom"],"key":[8,0],"bars":[{"x":18,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":18,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":18,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":5,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":11,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":6,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":7,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":9,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":10,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"},{"x":8,"y":2,"orientation":"v","length":17,"isBlocking":false,"type":"normal"},{"x":3,"y":16,"orientation":"h","length":11,"isBlocking":false,"type":"normal"},{"x":3,"y":7,"orientation":"h","length":11,"isBlocking":false,"type":"normal"}],"trees":[],"moons":[]}, 5:{"walls":[{"x":8,"y":1,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":5,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":7,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":12,"y":0,"orientation":"v","length":16,"isBlocking":true,"type":"blocking"},{"x":17,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":17,"y":15,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["top","left","bottom","right"],"key":null,"bars":[{"x":8,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":14,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":12,"y":13,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":6,"y":19,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":6,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":12,"y":12,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":19,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"}],"trees":[[7,12],[7,7],[7,3],[11,17],[8,14],[17,17]],"moons":[]}, 6:{"walls":[{"x":16,"y":1,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":5,"y":4,"orientation":"h","length":7,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":13,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":10,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":4,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":4,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":2,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":7,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":9,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":14,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":18,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"}],"doors":[],"fullDoors":["bottom","top","right"],"key":null,"bars":[{"x":16,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":18,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":8,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":9,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":10,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":7,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":6,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":6,"y":4,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":11,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":5,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":13,"y":7,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":13,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":13,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":0,"y":5,"orientation":"h","length":16,"isBlocking":false,"type":"normal"},{"x":2,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":7,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":0,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":14,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":19,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"}],"trees":[[13,16],[12,18],[12,17],[13,18],[14,17],[14,16],[11,17],[7,16],[2,18],[1,17],[2,16],[3,17],[3,16],[12,16]],"moons":[]}, 7:{"walls":[{"x":15,"y":1,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":3,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":8,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":13,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":16,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":18,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":8,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":11,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"h","length":3,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["top","right"],"key":[7,5],"bars":[{"x":15,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":19,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"trees":[[1,10],[2,10],[3,11],[2,12],[1,11],[12,10],[10,11],[11,10],[13,11],[12,12],[11,13],[10,12],[7,9],[6,8],[8,8],[9,7],[10,6],[10,4],[10,5],[9,3],[8,3],[7,2],[6,2],[5,3],[4,6],[3,6],[4,5],[4,4]],"moons":[]}, 8:{"walls":[{"x":14,"y":8,"orientation":"h","length":6,"isBlocking":true,"type":"blocking"},{"x":14,"y":8,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":6,"y":14,"orientation":"h","length":14,"isBlocking":true,"type":"blocking"},{"x":11,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":7,"y":9,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":7,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":6,"y":5,"orientation":"v","length":9,"isBlocking":false,"type":"normal"},{"x":6,"y":14,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":11,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":0,"y":15,"orientation":"h","length":4,"isBlocking":false,"type":"normal"},{"x":0,"y":12,"orientation":"h","length":4,"isBlocking":false,"type":"normal"},{"x":1,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":3,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":2,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":13,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"doors":[["bottom",1]],"fullDoors":["top","right"],"key":null,"bars":[{"x":6,"y":5,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":11,"y":12,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":13,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":3,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":19,"y":14,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]}, 9:{"walls":[{"x":0,"y":15,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":0,"y":11,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":9,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":11,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":18,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"}],"doors":[["left",12]],"fullDoors":["left","bottom","right"],"key":null,"bars":[{"x":0,"y":19,"orientation":"h","length":20,"isBlocking":false,"type":"normal"},{"x":2,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"trees":[[12,17],[14,16],[7,16],[5,17],[19,17]],"moons":[]}, 10:{"walls":[{"x":0,"y":14,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":8,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":0,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":3,"y":5,"orientation":"v","length":9,"isBlocking":false,"type":"normal"},{"x":3,"y":9,"orientation":"h","length":17,"isBlocking":true,"type":"blocking"},{"x":0,"y":17,"orientation":"h","length":20,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["left","right","top"],"key":null,"bars":[{"x":19,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":17,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":15,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":13,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":11,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":9,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":0,"y":5,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":7,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":5,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]}, 11:{"walls":[{"x":0,"y":14,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":17,"y":11,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":5,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":5,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":0,"y":17,"orientation":"h","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":9,"orientation":"h","length":13,"isBlocking":true,"type":"blocking"}],"doors":[],"fullDoors":["top","left"],"key":null,"bars":[{"x":14,"y":0,"orientation":"v","length":14,"isBlocking":false,"type":"normal"},{"x":19,"y":13,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":12,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":11,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":3,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":6,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":10,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":12,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":4,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":2,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":0,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"}],"trees":[[15,4],[15,9],[17,1]],"moons":[[18,7]]}, 12:{"walls":[{"x":2,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":0,"y":15,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":4,"y":0,"orientation":"v","length":15,"isBlocking":true,"type":"blocking"},{"x":5,"y":14,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":12,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":9,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":7,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":4,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":2,"orientation":"h","length":3,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["left","bottom","top"],"key":null,"bars":[{"x":14,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":19,"orientation":"h","length":8,"isBlocking":false,"type":"normal"},{"x":2,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":19,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"}],"trees":[[0,16],[6,16],[6,10],[5,5],[6,0],[17,4],[18,2],[17,10],[17,7],[18,13],[17,16],[18,18],[17,14],[17,0],[17,12],[17,9],[17,5],[17,17],[17,3],[15,18],[15,14],[15,10],[15,6],[15,2],[18,9],[18,6],[18,8],[19,11],[19,16],[19,4],[19,1],[19,5]],"moons":[]}, 13:{"walls":[{"x":5,"y":19,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":17,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":13,"orientation":"v","length":7,"isBlocking":true,"type":"blocking"},{"x":0,"y":13,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":17,"y":18,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":19,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":18,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":18,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":1,"y":7,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":3,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":4,"y":9,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":10,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":6,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":5,"orientation":"h","length":1,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["bottom"],"key":[12,7],"bars":[{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"},{"x":5,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":14,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":14,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":14,"y":15,"orientation":"v","length":5,"isBlocking":false,"type":"normal"},{"x":14,"y":15,"orientation":"h","length":6,"isBlocking":false,"type":"normal"},{"x":19,"y":13,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":12,"orientation":"h","length":11,"isBlocking":false,"type":"normal"},{"x":9,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":1,"y":9,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":1,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":5,"y":5,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":3,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":3,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":1,"y":0,"orientation":"h","length":19,"isBlocking":true,"type":"blocking"}],"trees":[[6,15],[18,16],[15,16],[15,18],[7,10],[15,10],[18,10],[6,3],[7,6],[10,2],[17,2],[19,3],[13,2],[18,6]],"moons":[]} };
+        const roomsData = {
+            1: {"walls":[{"x":0,"y":1,"orientation":"h","length":15,"isBlocking":true,"type":"blocking"},{"x":0,"y":16,"orientation":"h","length":18,"isBlocking":true,"type":"blocking"},{"x":18,"y":16,"orientation":"v","length":4,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":12,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":14,"y":10,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":10,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":6,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":8,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":8,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":9,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"}],"doors":[["left",12]],"fullDoors":[],"key":[17,13],"bars":[{"x":15,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":16,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":0,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":16,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":16,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":1,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":2,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":5,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":7,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":9,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]},
+            2: {"walls":[{"x":19,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":18,"y":10,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":19,"y":11,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":19,"y":15,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":18,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":18,"y":10,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":12,"y":15,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":12,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"},{"x":12,"y":15,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":8,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":6,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":4,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":2,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":10,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["top","bottom","left"],"key":null,"bars":[{"x":12,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":11,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":13,"y":11,"orientation":"v","length":4,"isBlocking":false,"type":"normal"},{"x":10,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":4,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":0,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"}],"trees":[[7,2],[7,10],[7,6],[7,18]],"moons":[]},
+            3: {"walls":[{"x":6,"y":3,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":12,"y":8,"orientation":"h","length":8,"isBlocking":true,"type":"blocking"},{"x":12,"y":8,"orientation":"v","length":12,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":4,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":12,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":14,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"}],"doors":[["left",12]],"fullDoors":["bottom"],"key":null,"bars":[{"x":6,"y":3,"orientation":"v","length":17,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":14,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":5,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":14,"y":4,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":12,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":19,"y":11,"orientation":"v","length":9,"isBlocking":true,"type":"blocking"}],"trees":[[9,5],[7,15],[7,10],[8,5]],"moons":[]},
+            4: {"walls":[{"x":16,"y":16,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":18,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":10,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":8,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":5,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":5,"y":1,"orientation":"h","length":7,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["bottom"],"key":[8,0],"bars":[{"x":18,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":16,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":18,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":8,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":18,"y":3,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":5,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":11,"y":0,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":6,"y":0,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":6,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":7,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":9,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":10,"y":0,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"},{"x":8,"y":2,"orientation":"v","length":17,"isBlocking":false,"type":"normal"},{"x":3,"y":16,"orientation":"h","length":11,"isBlocking":false,"type":"normal"},{"x":3,"y":7,"orientation":"h","length":11,"isBlocking":false,"type":"normal"}],"trees":[],"moons":[]},
+            5: {"walls":[{"x":8,"y":1,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":5,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":7,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":8,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":12,"y":0,"orientation":"v","length":16,"isBlocking":true,"type":"blocking"},{"x":17,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":17,"y":15,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"}],"doors":[["right",12]],"fullDoors":["top","left","bottom","right"],"key":null,"bars":[{"x":8,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":10,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":14,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":12,"y":13,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":6,"y":19,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":6,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":12,"y":12,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":19,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"}],"trees":[[7,12],[7,7],[7,3],[11,17],[8,14],[17,17]],"moons":[]},
+            6: {"walls":[{"x":16,"y":1,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":3,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":5,"y":4,"orientation":"h","length":7,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":13,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":10,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":4,"y":6,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":4,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":2,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":7,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":9,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":14,"y":11,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":16,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"},{"x":18,"y":12,"orientation":"v","length":3,"isBlocking":true,"type":"blocking"}],"doors":[],"fullDoors":["bottom","top","right"],"key":null,"bars":[{"x":16,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":18,"y":1,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":15,"y":0,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":8,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":9,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":10,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":7,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":6,"y":4,"orientation":"v","length":1,"isBlocking":false,"type":"normal"},{"x":6,"y":4,"orientation":"h","length":5,"isBlocking":false,"type":"normal"},{"x":11,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":5,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":13,"y":7,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":13,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":13,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":0,"y":5,"orientation":"h","length":16,"isBlocking":false,"type":"normal"},{"x":2,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":7,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":0,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"},{"x":12,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":12,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":7,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":11,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":12,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":13,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":16,"y":14,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":19,"y":0,"orientation":"v","length":10,"isBlocking":true,"type":"blocking"}],"trees":[[13,16],[12,18],[12,17],[13,18],[14,17],[14,16],[11,17],[7,16],[2,18],[1,17],[2,16],[3,17],[3,16],[12,16]],"moons":[]},
+            7: {"walls":[{"x":15,"y":1,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":3,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":8,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":13,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":16,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":18,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":8,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":11,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"h","length":3,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["top","right"],"key":[7,5],"bars":[{"x":15,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":16,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":11,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":6,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":17,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":15,"y":1,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":19,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"trees":[[1,10],[2,10],[3,11],[2,12],[1,11],[12,10],[10,11],[11,10],[13,11],[12,12],[11,13],[10,12],[7,9],[6,8],[8,8],[9,7],[10,6],[10,4],[10,5],[9,3],[8,3],[7,2],[6,2],[5,3],[4,6],[3,6],[4,5],[4,4]],"moons":[]},
+            8: {"walls":[{"x":14,"y":8,"orientation":"h","length":6,"isBlocking":true,"type":"blocking"},{"x":14,"y":8,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":6,"y":14,"orientation":"h","length":14,"isBlocking":true,"type":"blocking"},{"x":11,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":7,"y":9,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":7,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":6,"y":5,"orientation":"v","length":9,"isBlocking":false,"type":"normal"},{"x":6,"y":14,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":11,"y":17,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":0,"y":15,"orientation":"h","length":4,"isBlocking":false,"type":"normal"},{"x":0,"y":12,"orientation":"h","length":4,"isBlocking":false,"type":"normal"},{"x":1,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":3,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":2,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":13,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"doors":[["bottom",1]],"fullDoors":["top","right"],"key":null,"bars":[{"x":6,"y":5,"orientation":"h","length":14,"isBlocking":false,"type":"normal"},{"x":11,"y":12,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":13,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":11,"y":11,"orientation":"h","length":3,"isBlocking":true,"type":"blocking"},{"x":0,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":3,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":19,"y":14,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]},
+            9: {"walls":[{"x":0,"y":15,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":0,"y":11,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":9,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":11,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":18,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"}],"doors":[["left",12]],"fullDoors":["left","bottom","right"],"key":null,"bars":[{"x":0,"y":19,"orientation":"h","length":20,"isBlocking":false,"type":"normal"},{"x":2,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":16,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":9,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"}],"trees":[[12,17],[14,16],[7,16],[5,17],[19,17]],"moons":[]},
+            10: {"walls":[{"x":0,"y":14,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":2,"y":8,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":0,"y":8,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":3,"y":5,"orientation":"v","length":9,"isBlocking":false,"type":"normal"},{"x":3,"y":9,"orientation":"h","length":17,"isBlocking":true,"type":"blocking"},{"x":0,"y":17,"orientation":"h","length":20,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["left","right","top"],"key":null,"bars":[{"x":19,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":17,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":15,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":13,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":11,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":9,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":0,"y":5,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":7,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":5,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"}],"trees":[],"moons":[]},
+            11: {"walls":[{"x":0,"y":14,"orientation":"h","length":20,"isBlocking":true,"type":"blocking"},{"x":17,"y":11,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":5,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":5,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":0,"y":17,"orientation":"h","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":9,"orientation":"h","length":13,"isBlocking":true,"type":"blocking"}],"doors":[],"fullDoors":["top","left"],"key":null,"bars":[{"x":14,"y":0,"orientation":"v","length":14,"isBlocking":false,"type":"normal"},{"x":19,"y":13,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":12,"orientation":"h","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":11,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":17,"y":4,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":18,"y":3,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":6,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":8,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":10,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":12,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":4,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":2,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"},{"x":0,"y":9,"orientation":"v","length":5,"isBlocking":true,"type":"blocking"}],"trees":[[15,4],[15,9],[17,1]],"moons":[[18,7]]},
+            12: {"walls":[{"x":2,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":16,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":0,"y":15,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":4,"y":0,"orientation":"v","length":15,"isBlocking":true,"type":"blocking"},{"x":5,"y":14,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":12,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":9,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":7,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":4,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":2,"orientation":"h","length":3,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["left","bottom","top"],"key":null,"bars":[{"x":14,"y":0,"orientation":"v","length":20,"isBlocking":false,"type":"normal"},{"x":0,"y":19,"orientation":"h","length":8,"isBlocking":false,"type":"normal"},{"x":2,"y":16,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":17,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":2,"y":18,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":12,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":5,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":2,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":0,"orientation":"v","length":19,"isBlocking":false,"type":"normal"},{"x":0,"y":0,"orientation":"v","length":11,"isBlocking":true,"type":"blocking"}],"trees":[[0,16],[6,16],[6,10],[5,5],[6,0],[17,4],[18,2],[17,10],[17,7],[18,13],[17,16],[18,18],[17,14],[17,0],[17,12],[17,9],[17,5],[17,17],[17,3],[15,18],[15,14],[15,10],[15,6],[15,2],[18,9],[18,6],[18,8],[19,11],[19,16],[19,4],[19,1],[19,5]],"moons":[]},
+            13: {"walls":[{"x":5,"y":19,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":5,"y":17,"orientation":"h","length":3,"isBlocking":false,"type":"normal"},{"x":4,"y":13,"orientation":"v","length":7,"isBlocking":true,"type":"blocking"},{"x":0,"y":13,"orientation":"h","length":4,"isBlocking":true,"type":"blocking"},{"x":17,"y":18,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":19,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":17,"y":18,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":19,"y":18,"orientation":"v","length":1,"isBlocking":true,"type":"blocking"},{"x":1,"y":7,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":2,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":3,"y":7,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":4,"y":9,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":10,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":6,"orientation":"h","length":1,"isBlocking":false,"type":"normal"},{"x":4,"y":5,"orientation":"h","length":1,"isBlocking":false,"type":"normal"}],"doors":[],"fullDoors":["bottom"],"key":[12,7],"bars":[{"x":0,"y":0,"orientation":"v","length":20,"isBlocking":true,"type":"blocking"},{"x":5,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":6,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":7,"y":17,"orientation":"v","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":14,"orientation":"h","length":2,"isBlocking":false,"type":"normal"},{"x":8,"y":14,"orientation":"v","length":6,"isBlocking":false,"type":"normal"},{"x":14,"y":15,"orientation":"v","length":5,"isBlocking":false,"type":"normal"},{"x":14,"y":15,"orientation":"h","length":6,"isBlocking":false,"type":"normal"},{"x":19,"y":13,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":9,"y":12,"orientation":"h","length":11,"isBlocking":false,"type":"normal"},{"x":9,"y":12,"orientation":"v","length":3,"isBlocking":false,"type":"normal"},{"x":1,"y":9,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":1,"y":6,"orientation":"h","length":2,"isBlocking":true,"type":"blocking"},{"x":5,"y":5,"orientation":"v","length":6,"isBlocking":true,"type":"blocking"},{"x":3,"y":9,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":3,"y":5,"orientation":"v","length":2,"isBlocking":true,"type":"blocking"},{"x":1,"y":0,"orientation":"h","length":19,"isBlocking":true,"type":"blocking"}],"trees":[[6,15],[18,16],[15,16],[15,18],[7,10],[15,10],[18,10],[6,3],[7,6],[10,2],[17,2],[19,3],[13,2],[18,6]],"moons":[]}
+        };
 
-        // --- Riddle Box Elements ---
         const riddleContainer = document.getElementById('riddle-container');
         const riddleText = document.getElementById('riddle-text');
         const riddleInput = document.getElementById('riddle-input');
         const riddleSubmit = document.getElementById('riddle-submit');
 
-        // Draw the game state
         function draw() {
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, 200, 200);
@@ -303,7 +441,7 @@
                 const isUsingRegularDoor = playerY >= 12 && playerY < 14;
                 if (!isUsingRegularDoor && conn.key && !keysPicked[conn.key]) {
                     keysDown = {};
-                    alert('The door is locked.');
+                    alert(translations[currentLanguage].locked_door);
                     bounceBack(direction);
                     return;
                 }
@@ -311,14 +449,14 @@
                  // No key check needed
             } else if (conn.key && !keysPicked[conn.key]) {
                 keysDown = {};
-                alert('The door is locked.');
+                alert(translations[currentLanguage].locked_door);
                 bounceBack(direction);
                 return;
             }
 
             if (conn.to === null) {
                 keysDown = {};
-                alert('You win!');
+                alert(translations[currentLanguage].you_win);
                 return;
             }
 
@@ -334,11 +472,11 @@
             else if (direction === 'bottom') playerY = 19;
             draw();
         }
-
+        
+        // --- Riddle Functions ---
         function showRiddle() {
             isRiddleActive = true;
-            const riddle = riddles[currentRoom];
-            riddleText.innerText = riddle.riddle;
+            riddleText.innerText = translations[currentLanguage]['riddle_' + currentRoom];
             riddleContainer.style.display = 'flex';
             riddleInput.focus();
         }
@@ -350,22 +488,27 @@
         }
 
         function checkRiddleAnswer() {
-            const riddle = riddles[currentRoom];
+            const explanationKey = 'explanation_' + currentRoom;
             const userAnswer = riddleInput.value.trim().toLowerCase();
-            
-            if (userAnswer === riddle.answer) {
-                alert(riddle.explanation);
+
+            // Get the correct answer for both English and Arabic
+            const englishAnswer = translations.en['answer_' + currentRoom];
+            const arabicAnswer = translations.ar['answer_' + currentRoom];
+
+            // Check if the user's answer matches either language's correct answer
+            if (userAnswer === englishAnswer || userAnswer === arabicAnswer) {
+                alert(translations[currentLanguage][explanationKey]);
                 keysPicked[currentRoom] = true;
                 hideRiddle();
                 updateKeyButton();
                 draw();
             } else {
-                alert('Wrong!');
+                alert(translations[currentLanguage].wrong_answer);
                 riddleInput.value = '';
                 riddleInput.focus();
             }
         }
-        
+
         function takeKey() {
             if (riddles[currentRoom]) {
                 showRiddle();
@@ -414,24 +557,25 @@
             delete keysDown[e.key];
         });
 
-        // Event listeners for the riddle box
         riddleSubmit.addEventListener('click', checkRiddleAnswer);
         riddleInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                checkRiddleAnswer();
-            }
+            if (e.key === 'Enter') checkRiddleAnswer();
         });
 
+        document.getElementById('lang-toggle-btn').addEventListener('click', toggleLanguage);
+        
         setInterval(() => {
-            if (isRiddleActive) return; // Pause movement
+            if (isRiddleActive) return;
             if (keysDown['ArrowUp']) move(0, -1);
             if (keysDown['ArrowDown']) move(0, 1);
             if (keysDown['ArrowLeft']) move(-1, 0);
             if (keysDown['ArrowRight']) move(1, 0);
         }, 120);
 
-        draw();
-        updateKeyButton();
+        // Initial setup on page load
+        setLanguage(currentLanguage); // Set the language
+        draw(); // Draw the initial room
+        updateKeyButton(); // Check if the key button should be visible
     </script>
 </body>
 </html>
